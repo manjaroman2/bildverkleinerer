@@ -242,7 +242,6 @@ class LinkedList:
 
     def indices(self, *nodes: List[Transform]):
         _copy = list(nodes)
-        print(_copy)
         r = [0] * len(_copy)
         i = 0
         for _node in self:
@@ -258,7 +257,6 @@ class LinkedList:
             i += 1
         if len(_copy) == 0:
             return r
-        print(r, len(_copy))
         raise Exception(f"Nodes with ids {[n._id for n in _copy]} not found")
 
     def __iter__(self):
@@ -549,7 +547,7 @@ class Config:
         config = self.__config
         if name in config:
             return config[name]
-        raise Exception(f"{name} not in Config")
+        return None 
 
     def __setattr__(self, name: Any, value: Any) -> None:
         if not self.is_priv(name):
@@ -560,7 +558,6 @@ class Config:
         return item in self.__config
 
     def save(self):
-        print(self.__config)
         dump = json_dumps(
             self.__config,
             cls=ConfigEncoder,
