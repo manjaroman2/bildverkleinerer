@@ -38,15 +38,16 @@ check_update() {
     done
     return $ret
 }
-git commit -am "$date" && git push 
 check_update
 ret=$?
 if [ $ret == 1 ]; then
     echo "no .py updates"
     sed -i "1 s/.*/$date/" $prog.py
+    git commit -am "upity" && git push 
     exit 1
 fi
 
+git commit -am "$date" && git push 
 printf -v date '%(%Y-%m-%d %H:%M:%S)T' -1
 date="build_date=\"$date\""
 echo $date
