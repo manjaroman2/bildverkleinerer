@@ -14,40 +14,37 @@ specpath="$scriptdir/../spec"
 pyinstaller_opts="--noupx --noconsole --specpath $specpath --distpath $distpath --workpath $buildpath" 
 date=$(head -n 1 $prog.py)
 sed -i "1 s/.*//" $prog.py
-# if [ -z $1 ]; then
-#     check_update() {
-#         ret=1
-#         for fn in *.py; do
-#             a=($(sha256sum $fn))
-#             if [ -f $fn.sha256sum ]; then
-#                 b=$(cat $fn.sha256sum)
-#                 if [[ "$a" != "$b" ]]; then
-#                     ret=0
-#                     echo $fn
-#                     echo "$a" >$fn.sha256sum
-#                 fi
-#             else
-#                 echo "$a" >$fn.sha256sum
-#                 ret=0
-#             fi
-#         done
-#         return $ret
-#     }
-#     check_update
-#     ret=$?
-#     if [ $ret == 1 ]; then
-#         echo "no updates"
-#         sed -i "1 s/.*/$date/" $prog.py
-#         exit 1
-#     fi
-# fi
 
 if [[ ! `git status --porcelain` ]]; then
     echo "no change"
-else
-    echo "yes change"
+    exit 1 
 fi
-exit 1
+
+check_update() {
+    ret=1
+    for fn in *.py; do
+        a=($(sha256sum $fn))
+        if [ -f $fn.sha256sum ]; then
+            b=$(cat $fn.sha256sum)
+            if [[ "$a" != "$b" ]]; then
+                ret=0
+                echo $fn
+                echo "$a" >$fn.sha256sum
+            fi
+        else
+            echo "$a" >$fn.sha256sum
+            ret=0
+        fi
+    done
+    return $ret
+}
+check_update
+ret=$?
+if [ $ret == 1 ]; then
+    echo "no .py updates"
+    sed -i "1 s/.*/$date/" $prog.py
+    exit 1
+fi
 
 printf -v date '%(%Y-%m-%d %H:%M:%S)T' -1
 date="build_date=\"$date\""
