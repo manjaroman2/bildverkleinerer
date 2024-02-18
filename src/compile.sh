@@ -43,7 +43,7 @@ ret=$?
 if [ $ret == 1 ]; then
     echo "no .py updates"
     sed -i "1 s/.*/$date/" $prog.py
-    gcp 
+    git commit -am "$date" && git push 
     exit 1
 fi
 
