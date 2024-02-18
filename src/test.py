@@ -6,8 +6,7 @@ from requests_oauthlib import OAuth2Session
 # clientid = "MarcManj-TestApp-SBX-5b4446ab8-1f41fcd0"
 # devid = "3b48f270-b45f-4d72-968d-da66d7ce9fcf"
 # clientsecret = "SBX-b4446ab8ade8-8e60-4356-a00f-556b"
-clientid = "MarcManj-TestApp-PRD-ab44d5824-5eb923d1"
-clientsecret="PRD-b44d5824acf4-a10c-4862-b782-672e"
+clientid, clientsecret = open("ebay-creds.txt", "r").read().splitlines()
 
 # authtoken = b64encode(f"{clientid}:{clientsecret}".encode())
 
