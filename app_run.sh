@@ -1,1 +1,0 @@
-python app_kivy/main.py

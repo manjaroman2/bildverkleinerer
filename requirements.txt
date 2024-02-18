@@ -1,3 +1,0 @@
-werkzeug
-ttkthemes
-pillow
