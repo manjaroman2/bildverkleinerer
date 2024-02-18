@@ -47,11 +47,11 @@ if [ $ret == 1 ]; then
     exit 1
 fi
 
-git commit -am "$date" && git push 
 printf -v date '%(%Y-%m-%d %H:%M:%S)T' -1
 date="build_date=\"$date\""
 echo $date
 sed -i.bak "1 s/.*/$date/" $prog.py
+git commit -am "$date" && git push 
 
 wine C:/Python38/python.exe -m pip install -r requirements.txt
 wine C:/Python38/Scripts/pyinstaller.exe $pyinstaller_opts $prog.py --hidden-import='PIL._tkinter_finder'
