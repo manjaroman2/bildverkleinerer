@@ -1,4 +1,4 @@
-build_date="2024-02-18 13:50:53"
+
 from typing import *
 from os import cpu_count
 from pathlib import Path
@@ -91,7 +91,6 @@ settings_theme = OptionMenu(
     *sorted(main_root.get_themes()),
     command=theme_on_change,
 )
-# theme.trace_add("write", theme_on_change)
 settings_theme.grid(row=0, column=1)
 settings_hidden = True
 settings_root_center = None
