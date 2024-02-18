@@ -3,7 +3,8 @@ win="${prog}_win"
 win_exec="${prog}.exe"
 lin="${prog}_lin"
 lin_exec="${prog}.bin"
-pyinstaller_opts="--noupx --noconsole"
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+pyinstaller_opts="--noupx --noconsole --specpath $SCRIPT_DIR/../spec --distpath $SCRIPT_DIR/../dist --workpath $SCRIPT_DIR/../build" 
 date=$(head -n 1 $prog.py)
 sed -i "1 s/.*//" $prog.py
 # if [ -z $1 ]; then
@@ -57,7 +58,6 @@ echo -n "$sha256" >dist/${lin_exec}.sha256
 rm -r dist/$prog
 
 push_update() {
-    cd links
     tag=$(head -n 1 tag.txt)
     tag="$(($tag + 1))"
     echo $tag >tag.txt

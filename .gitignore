@@ -3,5 +3,6 @@ images/
 skaliert/
 build/
 dist/
+spec/
 *.sha256sum
 *.bak
