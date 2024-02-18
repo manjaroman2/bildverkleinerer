@@ -38,12 +38,12 @@ check_update() {
     done
     return $ret
 }
+git commit -am "$date" && git push 
 check_update
 ret=$?
 if [ $ret == 1 ]; then
     echo "no .py updates"
     sed -i "1 s/.*/$date/" $prog.py
-    git commit -am "$date" && git push 
     exit 1
 fi
 

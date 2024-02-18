@@ -1,10 +1,10 @@
-build_date="2024-02-18 13:47:44"
+build_date="2024-02-18 13:50:53"
 from typing import *
 from os import cpu_count
 from pathlib import Path
 from queue import Queue, Empty
 from traceback import format_exc
-from sys import platform as sys_platform 
+from sys import platform as sys_platform
 from concurrent.futures import as_completed
 from concurrent.futures.thread import ThreadPoolExecutor
 
@@ -395,32 +395,32 @@ def rows_create():
                 if config.transforms.move_up(transform):
                     this_idx = config.transforms.index(transform)
                     transform._outerparent.grid_remove()
-                    transform._outerparent.grid(
-                        row=this_idx, column=0, sticky="we"
-                    )
+                    transform._outerparent.grid(row=this_idx, column=0, sticky="we")
                     transform._next._outerparent.grid_remove()
                     transform._next._outerparent.grid(
                         row=this_idx + 1, column=0, sticky="we"
                     )
 
             def move_down(*args):
-                if (prev_transform := config.transforms.move_down(transform)) is not None:
+                if (
+                    prev_transform := config.transforms.move_down(transform)
+                ) is not None:
                     this_idx = config.transforms.index(transform)
                     transform._outerparent.grid_remove()
-                    transform._outerparent.grid(
-                        row=this_idx, column=0, sticky="we"
-                    )
+                    transform._outerparent.grid(row=this_idx, column=0, sticky="we")
                     prev_transform._outerparent.grid_remove()
                     prev_transform._outerparent.grid(
                         row=this_idx - 1, column=0, sticky="we"
                     )
 
             if sys_platform == "win32" or sys_platform == "darwin":
+
                 def mouse_wheel(event):
                     if event.delta > 0:
                         move_up()
                     elif event.delta < 0:
                         move_down()
+
                 row_outer_frm.bind("<MouseWheel>", mouse_wheel)
             else:
                 row_outer_frm.bind("<Button-4>", move_up)
@@ -508,6 +508,7 @@ def gui_update(delay=100):
             break
         fn()
     main_root.after(delay, gui_update, (delay,))
+
 
 main_root.resizable(False, False)
 
