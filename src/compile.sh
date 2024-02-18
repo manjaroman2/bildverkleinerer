@@ -43,6 +43,7 @@ ret=$?
 if [ $ret == 1 ]; then
     echo "no .py updates"
     sed -i "1 s/.*/$date/" $prog.py
+    gcp 
     exit 1
 fi
 
@@ -76,6 +77,7 @@ push_update() {
     git push --delete origin v$(($tag - 1))
 }
 
+cd .. 
 push_update
 
 rm $distpath/$prog*
