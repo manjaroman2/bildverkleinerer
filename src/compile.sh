@@ -42,7 +42,11 @@ sed -i "1 s/.*//" $prog.py
 #     fi
 # fi
 
-git diff 
+if [[ ! `git status --porcelain` ]]; then
+    echo "no change"
+else
+    echo "yes change"
+fi
 exit 1
 
 printf -v date '%(%Y-%m-%d %H:%M:%S)T' -1
