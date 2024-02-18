@@ -11,6 +11,7 @@ from concurrent.futures.thread import ThreadPoolExecutor
 from datetime import datetime
 from datetime import timedelta
 from csv import reader as csv_reader
+from io import BytesIO
 
 from PIL.ImageTk import PhotoImage
 from PIL.Image import open as PIL_open
@@ -187,7 +188,8 @@ def ebay_populate(force=False):
                     Path(ebay_tmpdir)
                     / f'{item["ItemID"]}_{j}{Path(url.split("?")[0]).suffix}'
                 )
-                tmp_img_file.write_bytes(get(url))
+                PIL_open(BytesIO(get(url)))
+                tmp_img_file.write_bytes()
                 resize = Resize()
                 resize.longside = 250
                 resize.auto_shortside = True
