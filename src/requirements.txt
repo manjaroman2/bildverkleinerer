@@ -1,3 +1,6 @@
 werkzeug
 ttkthemes
 pillow
+oauthlib
+requests
+requests-oauthlib

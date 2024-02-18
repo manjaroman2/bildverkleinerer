@@ -4,5 +4,6 @@ skaliert/
 build/
 dist/
 spec/
+env/
 *.sha256sum
 *.bak
