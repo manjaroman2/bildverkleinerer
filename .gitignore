@@ -5,5 +5,10 @@ build/
 dist/
 spec/
 env/
+ebaycreds.py
+__pycache__/
+data
+*.yaml
+*.txt
 *.sha256sum
 *.bak

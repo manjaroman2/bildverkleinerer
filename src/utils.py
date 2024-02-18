@@ -43,7 +43,7 @@ def run_in_thread(
         def _wrapper():
             _queue.put_nowait(stdout_helpers.redirect())
             ret = target()
-            if handle_return:
+            if handle_return is not None:
                 handle_return(ret)
             stdout_helpers.stop_redirect()
 
@@ -55,7 +55,7 @@ def run_in_thread(
 
     def _wrapper():
         ret = target()
-        if handle_return:
+        if handle_return is not None:
             handle_return(ret)
 
     t = Thread(target=_wrapper)
@@ -493,6 +493,15 @@ TRANSFORM_CLS_NAME_TO_CLASS_OBJ: Dict[str, Type[Transform]] = dict(
 TRANSFORM_CLS_NAMES = list(TRANSFORM_CLS_NAME_TO_CLASS_OBJ.keys())
 
 
+class Token:
+    def __init__(self, value, expires) -> None:
+        self.value = value
+        self.expires = expires
+
+    def __repr__(self) -> str:
+        return self.value
+
+
 class ConfigEncoder(JSONEncoder):
     def default(self, o):
         if isinstance(o, Path):
@@ -508,6 +517,8 @@ class ConfigEncoder(JSONEncoder):
             }
         if isinstance(o, LinkedList):
             return {"__linkedlist__": [x for x in o]}
+        if isinstance(o, Token):
+            return {"__token__": {"value": o.value, "expires": o.expires}}
         return JSONEncoder.default(self, o)
 
 
@@ -520,6 +531,8 @@ def from_json(o):
         )
     if "__linkedlist__" in o:
         return LinkedList(o["__linkedlist__"])
+    if "__token__" in o:
+        return Token(**o["__token__"])
     return o
 
 
@@ -533,9 +546,7 @@ class Config:
         self.__file = file
         if not file.exists():
             file.write_text("{}")
-        config = (
-            json_loads(file.read_text(), object_hook=from_json)
-        )
+        config = json_loads(file.read_text(), object_hook=from_json)
         for name in dir(self):
             if not self.is_priv(name) and not callable(value := getattr(self, name)):
                 config[name] = value
@@ -547,7 +558,7 @@ class Config:
         config = self.__config
         if name in config:
             return config[name]
-        return None 
+        return None
 
     def __setattr__(self, name: Any, value: Any) -> None:
         if not self.is_priv(name):
