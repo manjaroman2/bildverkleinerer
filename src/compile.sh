@@ -3,8 +3,15 @@ win="${prog}_win"
 win_exec="${prog}.exe"
 lin="${prog}_lin"
 lin_exec="${prog}.bin"
-SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-pyinstaller_opts="--noupx --noconsole --specpath $SCRIPT_DIR/../spec --distpath $SCRIPT_DIR/../dist --workpath $SCRIPT_DIR/../build" 
+scriptdir=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+if [ ! $scriptdir == $PWD ]; then 
+    cd $scriptdir
+    echo "-> cd $scriptdir" 
+fi 
+distpath="$scriptdir/../dist"
+buildpath="$scriptdir/../build"
+specpath="$scriptdir/../spec"
+pyinstaller_opts="--noupx --noconsole --specpath $specpath --distpath $distpath --workpath $buildpath" 
 date=$(head -n 1 $prog.py)
 sed -i "1 s/.*//" $prog.py
 # if [ -z $1 ]; then
@@ -45,30 +52,29 @@ sed -i.bak "1 s/.*/$date/" $prog.py
 
 wine C:/Python38/python.exe -m pip install -r requirements.txt
 wine C:/Python38/Scripts/pyinstaller.exe $pyinstaller_opts $prog.py --hidden-import='PIL._tkinter_finder'
-tar cf - dist/$prog/* | xz -4e >dist/${win}.tar.xz
-sha256=($(sha256sum dist/${prog}/${win_exec}))
-echo -n "$sha256" >dist/${win_exec}.sha256
-rm -r dist/$prog
+tar cf - $distpath/$prog/* | xz -4e >$distpath/${win}.tar.xz
+sha256=($(sha256sum $distpath/${prog}/${win_exec}))
+echo -n "$sha256" >$distpath/${win_exec}.sha256
+rm -r $distpath/$prog
 
 pyinstaller $pyinstaller_opts $prog.py --hidden-import='PIL._tkinter_finder'
-mv dist/$prog/$prog dist/$prog/$lin_exec
-tar cf - dist/$prog/* | xz -4e >dist/${lin}.tar.xz
-sha256=($(sha256sum dist/${prog}/${lin_exec}))
-echo -n "$sha256" >dist/${lin_exec}.sha256
-rm -r dist/$prog
+mv $distpath/$prog/$prog $distpath/$prog/$lin_exec
+tar cf - $distpath/$prog/* | xz -4e >$distpath/${lin}.tar.xz
+sha256=($(sha256sum $distpath/${prog}/${lin_exec}))
+echo -n "$sha256" >$distpath/${lin_exec}.sha256
+rm -r $distpath/$prog
 
 push_update() {
     tag=$(head -n 1 tag.txt)
     tag="$(($tag + 1))"
     echo $tag >tag.txt
     git commit -am "v$tag" && git push
-    gh release create v$tag -F changelog.md ../dist/$prog*
+    gh release create v$tag -F changelog.md $distpath/$prog*
     echo "v$tag"
     gh release delete v$(($tag - 1)) --yes
     git push --delete origin v$(($tag - 1))
-    cd ..
 }
 
 push_update
 
-rm dist/$prog*
+rm $distpath/$prog*
