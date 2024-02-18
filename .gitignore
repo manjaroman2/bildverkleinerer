@@ -1,0 +1,7 @@
+# *
+images/
+skaliert/
+build/
+dist/
+*.sha256sum
+*.bak
