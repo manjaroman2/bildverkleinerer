@@ -1,6 +1,7 @@
 werkzeug
 ttkthemes
 pillow
-oauthlib
-requests
-requests-oauthlib
+tksvg
+lxml
+pyngrok
+git+https://github.com/timotheus/ebaysdk-python.git

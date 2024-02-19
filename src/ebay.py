@@ -10,6 +10,7 @@ from json import loads as json_loads, dumps as json_dumps
 from utils import Token
 from ebaysdk.trading import Connection as Trading
 from ebaycreds import *
+from http.client import HTTPResponse
 
 Authorization = b64encode(f"{clientid}:{clientsecret}".encode()).decode()
 Authorization = f"Basic {Authorization}"
@@ -17,20 +18,28 @@ Authorization = f"Basic {Authorization}"
 redirect_url = "Marc_Manjaro-MarcManj-TestAp-zsftkom"
 
 scope = "https://api.ebay.com/oauth/api_scope/sell.marketing.readonly https://api.ebay.com/oauth/api_scope/sell.marketing https://api.ebay.com/oauth/api_scope/sell.inventory.readonly https://api.ebay.com/oauth/api_scope/sell.inventory https://api.ebay.com/oauth/api_scope/sell.account.readonly https://api.ebay.com/oauth/api_scope/sell.account https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly https://api.ebay.com/oauth/api_scope/sell.fulfillment https://api.ebay.com/oauth/api_scope/sell.analytics.readonly https://api.ebay.com/oauth/api_scope/sell.finances https://api.ebay.com/oauth/api_scope/sell.payment.dispute https://api.ebay.com/oauth/api_scope/commerce.identity.readonly https://api.ebay.com/oauth/api_scope/sell.reputation https://api.ebay.com/oauth/api_scope/sell.reputation.readonly https://api.ebay.com/oauth/api_scope/commerce.notification.subscription https://api.ebay.com/oauth/api_scope/commerce.notification.subscription.readonly https://api.ebay.com/oauth/api_scope/sell.stores https://api.ebay.com/oauth/api_scope/sell.stores.readonly"
+
+
 # for x in scope.split(" "):
 #     print(x)
+def get2(url) -> HTTPResponse:
+    return urlopen(Request(url, method="GET", headers={"User-Agent": "Mozilla/5.0"}))
+
 
 def get(url):
-    return urlopen(Request(url, method="GET", headers={'User-Agent': 'Mozilla/5.0'})).read()
+    return urlopen(
+        Request(url, method="GET", headers={"User-Agent": "Mozilla/5.0"})
+    ).read()
+
 
 class Api:
-    def __init__(self, token=None, code=None, debug=False) -> None:
-        self.code = code
+    def __init__(
+        self, config, access_token=None, refresh_token=None, debug=False
+    ) -> None:
+        self.config = config
         self.debug = debug
-        self.token: Token = token
-        if self.token is not None:
-            self.trading = Trading(debug=True, config_file=None, appid=clientid, certid=clientsecret, devid=devid, token=self.token.value, warnings=True, timeout=20)
-
+        self.access_token: Token = access_token
+        self.refresh_token: Token = refresh_token
 
     def post(self, url, headers=dict(), data=dict()):
         req = Request(url, data=urlencode(data).encode(), method="POST")
@@ -43,8 +52,16 @@ class Api:
             print(req.data)
         return urlopen(req)
 
+    def post_json(
+        self,
+        url,
+        headers={"Content-Type": "application/json", "Content-Language": "de-DE"},
+        data=dict(),
+    ):
+        return self.post(url, headers, data)
+
     def post_auth(self, url, headers=dict(), data=dict()):
-        headers["Authorization"] = f"Bearer {self.get_token()}"
+        headers["Authorization"] = f"Bearer {self.get_access_token()}"
         return self.post(url, headers=headers, data=data)
 
     def post_auth_json(
@@ -55,27 +72,38 @@ class Api:
     ):
         return self.post_auth(url, headers, data)
 
-    def get_token(self):
-        def post_auth_code():
-            # https://api.ebay.com/identity/v1/oauth2/token
-            return self.post(
-                "https://api.ebay.com/identity/v1/oauth2/token",
-                {
-                    "Content-Type": "application/x-www-form-urlencoded",
-                    "Authorization": Authorization,
-                },
-                data={
-                    "grant_type": "authorization_code",
-                    "redirect_uri": redirect_url,
-                    "code": self.code,
-                },
-            )
+    def post_auth_code(self, code: Token):
+        return json_loads(self.post(
+            "https://api.ebay.com/identity/v1/oauth2/token",
+            headers={
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Authorization": Authorization,
+            },
+            data={
+                "grant_type": "authorization_code",
+                "redirect_uri": redirect_url,
+                "code": code,
+            },
+        ).read().decode())
 
-        if self.token is None or self.token.expires <= int(time()) + 10:
-            r = json_loads(post_auth_code().read().decode())
-            self.token = Token(r["access_token"], int(time()) + r["expires_in"])
-        self.trading = Trading(debug=self.debug, config_file=None, appid=clientid, certid=clientsecret, devid=devid, token=self.token.value, warnings=True, timeout=20)
-        return self.token
+    def post_refresh_token(self):
+        return json_loads(self.post_json(
+            "https://api.ebay.com/identity/v1/oauth2/token",
+            headers={
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Authorization": Authorization,
+            },
+            data={
+                "grant_type": "refresh_token",
+                "refresh_token": self.refresh_token,
+            },
+        ).read().decode())
+
+    def get_access_token(self):
+        if self.access_token is None or self.access_token.expires <= int(time()) + 10:
+            r = self.post_refresh_token()
+            self.access_token = Token(r["access_token"], r["expires_in"])
+        return self.access_token
 
     def get(self, url, headers=dict(), params=dict()):
         req = Request(f"{url}?{urlencode(params)}", method="GET")
@@ -89,7 +117,7 @@ class Api:
         return urlopen(req)
 
     def get_auth(self, url, headers=dict(), params=dict()):
-        headers["Authorization"] = f"Bearer {self.get_token()}"
+        headers["Authorization"] = f"Bearer {self.get_access_token()}"
         return self.get(url, headers=headers, params=params)
 
     def get_auth_json(self, url, headers=dict(), params=dict()):
@@ -105,10 +133,18 @@ class Api:
 
     def get_user(self):
         return self.get_auth_json("https://apiz.ebay.com/commerce/identity/v1/user/")
-    
-    def trading_exec(self, verb, data = None):
-        self.get_token()
-        return self.trading.execute(verb, data)
+
+    def trading_exec(self, verb, data=None):
+        return Trading(
+            debug=self.debug,
+            config_file=None,
+            appid=clientid,
+            certid=clientsecret,
+            devid=devid,
+            token=self.get_access_token().value,
+            warnings=True,
+            timeout=20,
+        ).execute(verb, data)
 
 
 # api.post_auth_json("https://api.ebay.com/sell/inventory/v1/offer")
@@ -118,8 +154,9 @@ class Api:
 # api.get("https://google.com", headers={"Content-Type": "json"}, params={"q": "lol"})
 
 
-def oauth_create_server(api: Api, out=None):
+def oauth_create_server():
     keep_running = True
+    code = None
 
     class Serv(BaseHTTPRequestHandler):
         def do_POST(self):
@@ -134,14 +171,18 @@ def oauth_create_server(api: Api, out=None):
             parsed = urlparse(self.path)
             response_code = 200
             if parsed.path == "/accepted":
-                params = dict(x.split("=") for x in unquote_plus(parsed.query).split("&"))
+                params = dict(
+                    x.split("=") for x in unquote_plus(parsed.query).split("&")
+                )
                 if "code" not in params:
                     print(parsed.query)
                     print(unquote_plus(parsed.query))
                     raise Exception("code not found in params")
-                
-                api.code = params["code"]
-                print(api.code)
+                # print(params)
+                # print("params")
+                # api.code = params["code"]
+                nonlocal code
+                code = Token(params["code"], int(time()) + int(params["expires_in"]))
                 nonlocal keep_running
                 keep_running = False
                 message = "accepted"
@@ -166,10 +207,9 @@ def oauth_create_server(api: Api, out=None):
             certfile=Path(__file__).parent / "server.cert",
             server_side=True,
         )
-        if out is not None:
-            out.put(httpd)
         while keep_running:
             httpd.handle_request()
+        return code
 
 
 def oauth_send_browser():

@@ -1,4 +1,4 @@
-build_date="2024-02-18 21:55:33"
+build_date = "2024-02-18 21:55:33"
 from typing import *
 from os import cpu_count
 from pathlib import Path
@@ -12,6 +12,7 @@ from datetime import datetime
 from datetime import timedelta
 from csv import reader as csv_reader
 from io import BytesIO
+from time import time
 
 from PIL.ImageTk import PhotoImage
 from PIL.Image import open as PIL_open
@@ -33,9 +34,49 @@ from utils import (
     run_in_thread,
     Config,
     Resize,
+    Token,
 )
 from common import get_datadir
-from ebay import Api, oauth_create_server, oauth_send_browser, get
+from ebay import Api, oauth_create_server, oauth_send_browser, get, get2
+from ebaycreds import ngrok_token
+from urllib.error import HTTPError
+from tkfontawesome import icon_to_image
+from pyngrok import ngrok, conf as ngrok_conf
+
+
+ngrok_running = False
+
+
+def run_ngrok():
+    # ngrok_conf.get_default().auth_token = ngrok_token
+    ngrok_process = ngrok.get_ngrok_process()
+    tunnel = ngrok.connect(
+        addr="https://localhost:4443",
+        proto="http",
+        domain="handy-verbally-catfish.ngrok-free.app",
+        bind_tls=True,
+    )
+    print(tunnel)
+    global ngrok_running
+    try:
+        ngrok_running = True
+        ngrok_process.proc.wait()
+    except KeyboardInterrupt:
+        print(" Shutting down server.")
+        ngrok.kill()
+        ngrok_running = False
+
+
+ngrok_conf.get_default().auth_token = ngrok_token
+try:
+    print(ngrok.get_tunnels())
+    r = get2("https://handy-verbally-catfish.ngrok-free.app")
+    print(r.status)
+    print(r.read())
+
+except HTTPError as e:
+    print(e)
+    run_in_thread(run_ngrok)
 
 
 gui_queue = Queue()
@@ -49,12 +90,16 @@ def gui_do(*args):
 screen_width, screen_height = get_curr_screen_geometry()
 datadir = get_datadir("bildverkleinerer")
 config = Config(datadir / "config.json")
-countries_csv_file = datadir / "countries.csv" 
+countries_csv_file = datadir / "countries.csv"
 if not countries_csv_file.exists():
-    countries_csv_file.write_bytes(get("https://raw.githubusercontent.com/lukes/ISO-3166-Countries-with-Regional-Codes/master/all/all.csv"))
+    countries_csv_file.write_bytes(
+        get(
+            "https://raw.githubusercontent.com/lukes/ISO-3166-Countries-with-Regional-Codes/master/all/all.csv"
+        )
+    )
 countries_csv = []
 with open(countries_csv_file) as csvfile:
-    spamreader = csv_reader(csvfile, delimiter=',')
+    spamreader = csv_reader(csvfile, delimiter=",")
     for row in spamreader:
         countries_csv.append(row)
 
@@ -70,53 +115,59 @@ font_text_big.configure(family=config.font_family, size=config.font_size + 4)
 
 # :start:ebay_root
 ebay_root = Toplevel(main_root)
-ebay_root_frame = Frame(ebay_root, padding=2)
+ebay_root_frame = Frame(ebay_root, padding=0)
 ebay_root_frame.grid(sticky="w")
+ebay_root_header = Frame(ebay_root_frame, padding=2, borderwidth=1, relief="solid")
+ebay_root_header.grid(row=0, columnspan=5, sticky="we")
 ebay_username = StringVar()
-Label(ebay_root_frame, textvariable=ebay_username).grid(
+Label(ebay_root_header, textvariable=ebay_username).grid(
     row=0, column=0, sticky="w", padx=(10, 0)
 )
 ebay_userid = StringVar()
-Label(ebay_root_frame, textvariable=ebay_userid).grid(
+Label(ebay_root_header, textvariable=ebay_userid).grid(
     row=0, column=1, sticky="w", padx=(10, 0)
 )
-ebay_marketplaceid = Label(ebay_root_frame)
-ebay_marketplaceid.grid(
-    row=0, column=2, sticky="w", padx=(10, 0)
-)
+ebay_marketplaceid = Label(ebay_root_header)
+ebay_marketplaceid.grid(row=0, column=2, sticky="w", padx=(10, 0))
 ebay_acctype = StringVar()
-Label(ebay_root_frame, textvariable=ebay_acctype).grid(
+Label(ebay_root_header, textvariable=ebay_acctype).grid(
     row=0, column=3, sticky="w", padx=(10, 0)
 )
 # ebay_text = Text(ebay_root_frame, state=DISABLED)
 # ebay_text.grid(row=2, columnspan=4)
 ebay_hidden = True
 ebay_root_center = None
-ebay_api = Api(code=config.ebay_code, token=config.ebay_token)
-ebay_tmpdir = datadir / "_tmp"
-ebay_tmpdir.mkdir(exist_ok=True)
+ebay_api = Api(
+    config=config, access_token=config.access_token, refresh_token=config.refresh_token
+)
+# ebay_tmpdir = datadir / "_tmp"
+# ebay_tmpdir.mkdir(exist_ok=True)
 ebay_populated = False
 photoimages: List[PhotoImage] = []
-ebay_flag_photoimage = None 
+ebay_flag_photoimage = None
 
 
 def ebay_populate(force=False):
     if ebay_populated and not force:
         return
-    config.ebay_token = ebay_api.get_token()
-    ebay_api.debug = True
+    # ebay_api.debug = True
+    config.access_token = ebay_api.get_access_token()
 
     i = 1
 
-    def offer_entry(title, condition, price, description, photoimages: List[PhotoImage]):
+    def offer_entry(
+        title, condition, price, description, photoimages: List[PhotoImage]
+    ):
         nonlocal i
         frm = Frame(ebay_root_frame, padding=0)
         frm.grid(row=i, column=0)
-        Label(frm, text=title).grid(row=0, column=0)
-        Label(frm, text=f"Zustand: {condition}").grid(row=1, column=0)
-        Label(frm, text=f"Preis: {price}").grid(row=2,  column=0)
-        Label(frm, text=f"Beschreibung: {description}", wraplength=500).grid(row=3,  column=0)
-        
+        Label(frm, text=title).grid(row=0, column=0, sticky="w")
+        Label(frm, text=f"{condition}").grid(row=1, column=0, sticky="w")
+        Label(frm, text=f"{price}").grid(row=2, column=0, sticky="w")
+        Label(frm, text=f"{description}", wraplength=500).grid(
+            row=3, column=0, sticky="w"
+        )
+
         # txt = Text(frm)
         # txt.grid(row=3,  column=0)
         # txt.insert(END, f"Beschreibung: {description}")
@@ -124,7 +175,7 @@ def ebay_populate(force=False):
 
         for j in range(0, len(photoimages)):
             Label(ebay_root_frame, image=photoimages[j]).grid(
-                row=i, column=j + 1, columnspan=3, sticky="nswe"
+                row=i, column=j + 1, sticky="nswe"
             )
         i += 1
 
@@ -132,19 +183,21 @@ def ebay_populate(force=False):
         r = ebay_api.trading_exec("GetUser").dict()
         print(r)
         r = r["User"]
+
         def country_set(country_string):
             country_code = ""
             for row in countries_csv:
                 if row[0] == country_string:
                     country_code = row[1]
                     break
-            flag_png = ebay_tmpdir / "flag.png"
-            url = f"https://flagsapi.com/{country_code}/shiny/32.png"
-            # print(url)
-            flag_png.write_bytes(get(url))
             global ebay_flag_photoimage
-            ebay_flag_photoimage = PhotoImage(PIL_open(flag_png))
+            ebay_flag_photoimage = PhotoImage(
+                PIL_open(
+                    BytesIO(get(f"https://flagsapi.com/{country_code}/shiny/32.png"))
+                )
+            )
             ebay_marketplaceid.configure(image=ebay_flag_photoimage)
+
         m = {
             ebay_userid.set: "Email",
             ebay_username.set: "UserID",
@@ -161,7 +214,7 @@ def ebay_populate(force=False):
             k(_r)
         gui_do(ebay_root.update_idletasks, lambda: ebay_root.geometry(""))
 
-        r = ebay_api.trading.execute(
+        r = ebay_api.trading_exec(
             "GetSellerList",
             {
                 "Pagination": {"EntriesPerPage": 10},
@@ -184,17 +237,23 @@ def ebay_populate(force=False):
                 picurls = [picurls]
             for j in range(len(picurls)):
                 url = picurls[j]
-                tmp_img_file = (
-                    Path(ebay_tmpdir)
-                    / f'{item["ItemID"]}_{j}{Path(url.split("?")[0]).suffix}'
-                )
-                PIL_open(BytesIO(get(url)))
-                tmp_img_file.write_bytes()
+                # tmp_img_file = (
+                #     Path(ebay_tmpdir)
+                #     / f'{item["ItemID"]}_{j}{Path(url.split("?")[0]).suffix}'
+                # )
                 resize = Resize()
                 resize.longside = 250
                 resize.auto_shortside = True
-                photoimages.append(PhotoImage(resize(PIL_open(tmp_img_file))))
-            offer_entry(item["Title"], item["ConditionDisplayName"], f'{item["StartPrice"]["value"]} {item["StartPrice"]["_currencyID"]}', item["Description"], photoimages)
+                # im = resize(PIL_open(BytesIO(get(url))))
+                # tmp_img_file.write_bytes()
+                photoimages.append(PhotoImage(resize(PIL_open(BytesIO(get(url))))))
+            offer_entry(
+                item["Title"],
+                item["ConditionDisplayName"],
+                f'{item["StartPrice"]["value"]} {item["StartPrice"]["_currencyID"]}',
+                item["Description"],
+                photoimages,
+            )
         ebay_root.update_idletasks()
         ebay_root.geometry("")
         ebay_root.update_idletasks()
@@ -206,10 +265,16 @@ def ebay_populate(force=False):
     run_in_thread(populate)
 
 
-ebay_reload = Button(ebay_root_frame, text="R", command=lambda: ebay_populate(force=True))
-ebay_reload.grid(
-    row=0, column=4, sticky="e", padx=(10, 0)
+# print(icon_to_image("redo", fill="#4267B2", scale_to_width=64).)
+# exit(1)
+
+ebay_reload = Button(
+    ebay_root_header,
+    image=icon_to_image("redo", fill="#4267B2", scale_to_width=64),
+    command=lambda: ebay_populate(force=True),
 )
+ebay_reload.grid(row=0, column=4, sticky="nswe", padx=(10, 0))
+
 
 def ebay_toggle():
     global ebay_hidden
@@ -219,17 +284,21 @@ def ebay_toggle():
     else:
         ebay_root_center()
         ebay_root.deiconify()
-        if ebay_api.code is None:
-            q = Queue()
+        if ebay_api.refresh_token is None:
 
-            def handle(_):
-                config.ebay_code = ebay_api.code
+            def handle(code: Token):
+                r = ebay_api.post_auth_code(code)
+                ebay_api.refresh_token = Token(
+                    r["refresh_token"], int(time()) + r["refresh_token_expires_in"]
+                )
+                config.refresh_token = ebay_api.refresh_token
+                ebay_api.access_token = Token(
+                    r["access_token"], int(time()) + r["expires_in"]
+                )
+                config.access_token = ebay_api.access_token
                 ebay_populate()
 
-            run_in_thread(
-                target=lambda: oauth_create_server(ebay_api, q), handle_return=handle
-            )
-            print(q.get())
+            run_in_thread(target=oauth_create_server, handle_return=handle)
             oauth_send_browser()
         else:
             ebay_populate()
@@ -316,6 +385,9 @@ settings_root.protocol("WM_DELETE_WINDOW", settings_toggle)
 def main_root_delete_win():
     config.save()
     main_root.destroy()
+    global ngrok_running
+    if ngrok_running:
+        ngrok.kill()
 
 
 main_root.protocol("WM_DELETE_WINDOW", main_root_delete_win)
